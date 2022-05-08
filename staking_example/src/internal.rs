@@ -3,8 +3,7 @@ use crate::*;
 #[near_bindgen]
 impl StakingContract {
     pub(crate) fn internal_unstake(&mut self, account_id: AccountId, amount: u128) {
-        let upgradable_account = self.accounts.get(&account_id).unwrap();
-        let mut account: Account = Account::from(upgradable_account);
+        let mut account = self.accounts.get(&account_id).unwrap();
 
         assert!(
             amount <= account.stake_balance,
@@ -27,6 +26,7 @@ impl StakingContract {
 
         self.accounts.insert(&account_id, &account);
 
+        //NOTE: Update global pool
         let new_contract_reward = self.internal_calculate_global_reward();
         self.pre_reward += new_contract_reward;
         self.last_block_balance_change = env::block_index();
@@ -34,8 +34,7 @@ impl StakingContract {
     }
 
     pub(crate) fn internal_withdraw(&mut self, account_id: AccountId) -> Account {
-        let upgradable_account = self.accounts.get(&account_id).unwrap();
-        let account = Account::from(upgradable_account);
+        let account = self.accounts.get(&account_id).unwrap();
 
         assert!(
             account.unstake_balance > 0,
@@ -63,15 +62,16 @@ impl StakingContract {
 
     pub(crate) fn internal_deposit_and_stake(&mut self, account_id: AccountId, amount: u128) {
         // Validate data
-        let upgradable_account = self.accounts.get(&account_id);
-        assert!(upgradable_account.is_some(), "ERR_ACCOUNT_NOT_FOUND");
+        let account = self.accounts.get(&account_id);
+        assert!(account.is_some(), "ERR_ACCOUNT_NOT_FOUND");
+        //TODO: Check contract of token A || token B
         assert_eq!(
             self.ft_contract_id,
             env::predecessor_account_id(),
             "ERR_INVALID_FT_CONTRACT_ID"
         );
 
-        let mut account = Account::from(upgradable_account.unwrap());
+        let mut account = Account::from(account.unwrap());
 
         if account.stake_balance == 0 {
             self.total_staker += 1;
@@ -111,6 +111,7 @@ impl StakingContract {
         let lasted_block = env::block_index();
 
         let diff_block = lasted_block - account.last_block_balance_change;
+        //NOTE: stake_balance * reward_per_block * diff_block
         let reward: Balance =
             (account.stake_balance * self.config.reward_numerator as u128 * diff_block as u128)
                 / self.config.reward_denumerator as u128;
@@ -118,10 +119,12 @@ impl StakingContract {
         reward
     }
 
+    //NOTE: For statistic
     pub(crate) fn internal_calculate_global_reward(&self) -> Balance {
         let lasted_block = env::block_index();
 
         let diff_block = lasted_block - self.last_block_balance_change;
+        //NOTE: total_stake_balance * reward_per_block * diff_block
         let reward: Balance =
             (self.total_stake_balance * self.config.reward_numerator as u128 * diff_block as u128)
                 / self.config.reward_denumerator as u128;
@@ -129,4 +132,3 @@ impl StakingContract {
         reward
     }
 }
-

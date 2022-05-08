@@ -48,7 +48,6 @@ impl StakingContract {
         assert_one_yocto();
 
         let account_id = env::predecessor_account_id();
-
         self.internal_unstake(account_id, amount.0);
     }
 
@@ -79,8 +78,7 @@ impl StakingContract {
     pub fn harvest(&mut self) -> Promise {
         assert_one_yocto();
         let account_id = env::predecessor_account_id();
-        let upgradable_account = self.accounts.get(&account_id).unwrap();
-        let account = Account::from(upgradable_account);
+        let account = self.accounts.get(&account_id).unwrap();
 
         let new_reward: Balance = self.internal_calculate_account_reward(&account);
         let current_reward: Balance = account.pre_reward + new_reward;
@@ -103,6 +101,7 @@ impl StakingContract {
         ))
     }
 
+    //Stake user token
     #[private]
     pub fn ft_transfer_callback(&mut self, amount: U128, account_id: AccountId) -> U128 {
         assert_eq!(env::promise_results_count(), 1, "ERR_TOO_MANY_RESULT");
@@ -139,4 +138,3 @@ impl StakingContract {
         }
     }
 }
-

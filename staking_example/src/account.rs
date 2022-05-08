@@ -1,5 +1,3 @@
-use near_sdk::Timestamp;
-
 use crate::*;
 
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
@@ -43,7 +41,3 @@ impl WrappedAccount {
         }
     }
 }
-
-// Timeline: t1 ----------- t2 ------------ now
-// Balance: 100k           200k
-
