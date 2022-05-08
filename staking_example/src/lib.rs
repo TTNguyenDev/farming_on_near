@@ -2,23 +2,24 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::LookupMap;
 use near_sdk::json_types::U128;
 use near_sdk::serde::{Deserialize, Serialize};
+use near_sdk::utils::assert_one_yocto;
 use near_sdk::Timestamp;
+
 use near_sdk::{
-    env, near_bindgen, AccountId, Balance, BlockHeight, BorshStorageKey, EpochHeight,
-    PanicOnDefault, Promise, PromiseOrValue,
+    env, ext_contract, near_bindgen, AccountId, Balance, BlockHeight, BorshStorageKey, EpochHeight,
+    Gas, PanicOnDefault, Promise, PromiseOrValue, PromiseResult,
 };
 
 use crate::account::*;
 pub use crate::account::*;
 use crate::config::*;
-use crate::util::*;
 
 mod account;
 mod config;
+mod constants;
 mod core_impl;
 mod enumeration;
 mod internal;
-mod util;
 
 #[derive(BorshDeserialize, BorshSerialize, BorshStorageKey)]
 pub enum StorageKey {
@@ -60,7 +61,11 @@ impl StakingContract {
 
     #[payable]
     pub fn storage_deposit(&mut self) {
-        assert_at_least_one_yocto();
+        assert!(
+            env::attached_deposit() >= 1,
+            "Requires attached deposit of at least 1 yoctoNEAR"
+        );
+
         let account = env::predecessor_account_id();
         let account_stake = self.accounts.get(&account);
 
@@ -86,5 +91,23 @@ impl StakingContract {
 
     pub fn get_new_data(&self) -> U128 {
         self.new_data
+    }
+}
+
+//NOTE: Utils
+pub(crate) fn refund_deposit(storage_used: u64) {
+    let required_cost = env::storage_byte_cost() * Balance::from(storage_used);
+    let attached_deposit = env::attached_deposit();
+
+    assert!(
+        attached_deposit >= required_cost,
+        "Must attach {} yoctoNear to cover storage",
+        required_cost
+    );
+
+    let refund = attached_deposit - required_cost;
+
+    if refund > 0 {
+        Promise::new(env::predecessor_account_id()).transfer(refund);
     }
 }
