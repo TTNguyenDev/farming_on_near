@@ -32,7 +32,7 @@ near view $CONTRACT_NAME get_staking_pool_info '{"contract_id": "'$TOKEN_A'"}'
 
 #Unstake - Unstake feature 
 ```sh
-near call $CONTRACT unstake '{"amount": 100}' --accountId staking-user.testnet
+near call $CONTRACT_NAME unstake '{"contract_id": "'$TOKEN_A'"}' --accountId user1-stakenet.testnet  --depositYocto 1 --gas 300000000000000
 
 ``` 
 

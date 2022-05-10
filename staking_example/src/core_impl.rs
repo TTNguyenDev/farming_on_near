@@ -23,7 +23,12 @@ pub trait FungibleToken {
 #[ext_contract(ext_self)]
 pub trait ExtStakingContract {
     fn ft_transfer_callback(&mut self, amount: U128, account_id: AccountId, contract_id: AccountId);
-    // fn ft_withdraw_callback(&mut self, account_id: AccountId, old_account: Account);
+    fn ft_withdraw_callback(
+        &mut self,
+        account_id: AccountId,
+        contract_id: AccountId,
+        balance: Balance,
+    );
     fn mint_reward_token_callback(&mut self);
 }
 
@@ -43,36 +48,32 @@ impl FungibleTokenReceiver for StakingContract {
 
 #[near_bindgen]
 impl StakingContract {
+    //NOTE: For this demo, Only allow unstake all
     #[payable]
-    pub fn unstake(&mut self, amount: U128, contract_id: AccountId) {
+    pub fn unstake(&mut self, contract_id: AccountId) -> Promise {
         assert_one_yocto();
 
         let account_id = env::predecessor_account_id();
-        self.internal_unstake(account_id, amount.0, contract_id);
+        let amount = self.internal_unstake(account_id.clone(), contract_id.clone());
+
+        //NOTE: Withdraw immediately
+        ext_ft_contract::ft_transfer(
+            account_id.clone(),
+            U128(amount),
+            Some("Staking contract withdraw".to_string()),
+            &contract_id,
+            DEPOSIT_ONE_YOCTO,
+            FT_TRANSFER_GAS,
+        )
+        .then(ext_self::ft_withdraw_callback(
+            account_id.clone(),
+            contract_id,
+            amount,
+            &env::current_account_id(),
+            NO_DEPOSIT,
+            FT_HARVEST_CALLBACK_GAS,
+        ))
     }
-
-    // #[payable]
-    // pub fn withdraw(&mut self) -> Promise {
-    //     assert_one_yocto();
-    //     let account_id = env::predecessor_account_id();
-    //     let old_account = self.internal_withdraw(account_id.clone());
-
-    //     ext_ft_contract::ft_transfer(
-    //         account_id.clone(),
-    //         U128(old_account.unstake_balance),
-    //         Some("Staking contract withdraw".to_string()),
-    //         &self.reward_contract_id,
-    //         DEPOSIT_ONE_YOCTO,
-    //         FT_TRANSFER_GAS,
-    //     )
-    //     .then(ext_self::ft_withdraw_callback(
-    //         account_id.clone(),
-    //         old_account,
-    //         &env::current_account_id(),
-    //         NO_DEPOSIT,
-    //         FT_HARVEST_CALLBACK_GAS,
-    //     ))
-    // }
 
     #[payable]
     pub fn harvest(&mut self, contract_id: AccountId) -> Promise {
@@ -135,17 +136,25 @@ impl StakingContract {
         }
     }
 
-    // pub fn ft_withdraw_callback(&mut self, account_id: AccountId, old_account: Account) -> U128 {
-    //     assert_eq!(env::promise_results_count(), 1, "ERR_TOO_MANY_RESULTS");
+    pub fn ft_withdraw_callback(
+        &mut self,
+        account_id: AccountId,
+        contract_id: AccountId,
+        balance: Balance,
+    ) -> U128 {
+        assert_eq!(env::promise_results_count(), 1, "ERR_TOO_MANY_RESULTS");
 
-    //     match env::promise_result(0) {
-    //         PromiseResult::NotReady => unreachable!(),
-    //         PromiseResult::Successful(_value) => U128(old_account.unstake_balance),
-    //         PromiseResult::Failed => {
-    //             // handle rollback data
-    //             self.accounts.insert(&account_id, &old_account);
-    //             U128(0)
-    //         }
-    //     }
-    // }
+        match env::promise_result(0) {
+            PromiseResult::NotReady => unreachable!(),
+            PromiseResult::Successful(_value) => U128(balance),
+            PromiseResult::Failed => {
+                //NOTE: handle rollback data
+                let mut account = self.accounts.get(&account_id).expect("User not found");
+                account.add_stake(&contract_id, balance);
+                self.accounts.insert(&account_id, &account);
+
+                U128(0)
+            }
+        }
+    }
 }

@@ -7,25 +7,16 @@ impl StakingContract {
     pub(crate) fn internal_unstake(
         &mut self,
         account_id: AccountId,
-        amount: u128,
         contract_id: AccountId,
-    ) {
+    ) -> Balance {
         let mut account = self.accounts.get(&account_id).unwrap();
-
-        assert!(
-            amount
-                <= *account
-                    .stake_balance
-                    .get(&contract_id.clone())
-                    .unwrap_or(&0),
-            "ERR_AMOUNT_MUST_LESS_THAN_STAKE_BALANCE"
-        );
 
         let new_reward = self.internal_calculate_account_reward(&account, contract_id.clone());
 
+        let user_stake_balance = account.get_stake_balance(contract_id.clone());
         // update account data
         account.add_reward(&contract_id.clone(), new_reward);
-        account.sub_stake(&contract_id.clone(), amount);
+        account.sub_stake(&contract_id.clone(), user_stake_balance);
 
         self.accounts.insert(&account_id, &account);
 
@@ -37,36 +28,11 @@ impl StakingContract {
         let new_contract_reward = self.internal_calculate_global_reward(contract_id.clone());
         staking_pool.pre_reward += new_contract_reward;
         staking_pool.last_block_balance_change = env::block_index();
-        staking_pool.total_stake_balance -= amount;
+        staking_pool.total_stake_balance -= user_stake_balance;
         self.staking_pools
             .insert(&contract_id.clone(), &staking_pool);
-    }
 
-    pub(crate) fn internal_withdraw(&mut self, account_id: AccountId) -> Account {
-        let account = self.accounts.get(&account_id).unwrap();
-
-        // assert!(
-        //     account.unstake_balance.get(&contract_id).unwrap(&0) > 0,
-        //     "ERR_UNSTAKE_BALANCE_EQUAL_ZERO"
-        // );
-        // assert!(
-        //     account.unstake_available_epoch <= env::epoch_height(),
-        //     "ERR_DISABLED_WITHDRAW"
-        // );
-
-        // let new_account = Account {
-        //     stake_balance: account.stake_balance,
-        //     pre_reward: account.pre_reward,
-        //     last_block_balance_change: account.last_block_balance_change,
-        //     unstake_balance: 0,
-        //     unstake_start_timestamp: 0,
-        //     unstake_available_epoch: 0,
-        //     new_account_data: account.new_account_data,
-        // };
-
-        // self.accounts.insert(&account_id, &new_account);
-
-        account
+        user_stake_balance
     }
 
     pub(crate) fn internal_deposit_and_stake(&mut self, account_id: AccountId, amount: u128) {
@@ -86,8 +52,9 @@ impl StakingContract {
             self.internal_calculate_account_reward(&account, env::predecessor_account_id());
 
         // update account data
-        account.add_reward(&account_id.clone(), new_reward);
-        account.add_stake(&account_id.clone(), amount);
+        account.add_reward(&env::predecessor_account_id(), new_reward);
+        account.add_stake(&env::predecessor_account_id(), amount);
+        env::log(format!("account status {:#?}", account).as_bytes());
         self.accounts.insert(&account_id, &account);
 
         // Update pool data

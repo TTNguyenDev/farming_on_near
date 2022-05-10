@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::*;
 
-#[derive(BorshDeserialize, BorshSerialize)]
+#[derive(BorshDeserialize, BorshSerialize, Debug)]
 // #[serde(crate = "near_sdk::serde")]
 pub struct Account {
     pub stake_balance: HashMap<AccountId, Balance>,
@@ -53,7 +53,7 @@ impl Account {
 
     pub(crate) fn sub_stake(&mut self, token: &AccountId, amount: Balance) {
         if let Some(x) = self.stake_balance.get_mut(token) {
-            assert!(*x > amount, "Substract overflow");
+            assert!(*x >= amount, "Substract overflow");
             *x = *x - amount;
 
             *self
@@ -61,7 +61,7 @@ impl Account {
                 .get_mut(token)
                 .unwrap_or(&mut 0) = env::block_index();
         } else {
-            panic!("Substract overflow");
+            panic!("Stake balance is zero");
         }
     }
 
