@@ -1,6 +1,6 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::collections::LookupMap;
-use near_sdk::json_types::U128;
+use near_sdk::collections::{LookupMap, UnorderedMap};
+use near_sdk::json_types::{WrappedBalance, U128};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::utils::assert_one_yocto;
 use near_sdk::Timestamp;
@@ -13,6 +13,9 @@ use near_sdk::{
 use crate::account::*;
 pub use crate::account::*;
 use crate::config::*;
+use crate::staking_pool::*;
+use constants::*;
+use core_impl::*;
 
 mod account;
 mod config;
@@ -20,44 +23,68 @@ mod constants;
 mod core_impl;
 mod enumeration;
 mod internal;
+mod staking_pool;
 
 #[derive(BorshDeserialize, BorshSerialize, BorshStorageKey)]
 pub enum StorageKey {
     AccountKey,
+    StakingPools,
 }
 
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 #[near_bindgen]
 pub struct StakingContract {
     pub owner_id: AccountId,
-    pub ft_contract_id: AccountId,
-    pub config: Config, // cấu hình công thức trả thưởng cho user,
-    pub total_stake_balance: Balance,
-    pub total_paid_reward_balance: Balance,
-    pub total_staker: Balance,
-    pub pre_reward: Balance,
-    pub last_block_balance_change: BlockHeight,
+    pub staking_pools: UnorderedMap<AccountId, StakingPoolInfo>,
+
+    pub reward_contract_id: AccountId,
+
     pub accounts: LookupMap<AccountId, Account>, // thông tin chi tiết của acount map theo account id
-    pub new_data: U128, //TODO: Implement a state for contract => Allow admin pause contract anytime
 }
 
 #[near_bindgen]
 impl StakingContract {
     #[init]
-    pub fn new(owner_id: AccountId, ft_contract_id: AccountId, config: Config) -> Self {
-        StakingContract {
+    pub fn new(owner_id: AccountId) -> Self {
+        let mut staking_contract = StakingContract {
             owner_id,
-            ft_contract_id,
-            config,
+            reward_contract_id: REWARD_TOKEN_ACCOUNT_ID.to_string(),
+            accounts: LookupMap::new(StorageKey::AccountKey),
+            staking_pools: UnorderedMap::new(StorageKey::StakingPools),
+        };
+
+        //Init staking_pools
+        let token_a = StakingPoolInfo {
+            weight: 60, //decimal = 0
             total_stake_balance: 0,
+            total_unstaked_balance: 0,
             total_paid_reward_balance: 0,
-            total_staker: 0,
             pre_reward: 0,
             last_block_balance_change: env::block_index(),
-            accounts: LookupMap::new(StorageKey::AccountKey),
             new_data: U128(0),
-        }
+        };
+
+        let token_b = StakingPoolInfo {
+            weight: 40, //decimal = 0
+            total_stake_balance: 0,
+            total_unstaked_balance: 0,
+            total_paid_reward_balance: 0,
+            pre_reward: 0,
+            last_block_balance_change: env::block_index(),
+            new_data: U128(0),
+        };
+
+        staking_contract
+            .staking_pools
+            .insert(&AccountId::from(TOKEN_A_ACCOUNT_ID), &token_a);
+
+        staking_contract
+            .staking_pools
+            .insert(&AccountId::from(TOKEN_B_ACCOUNT_ID), &token_b);
+        staking_contract
     }
+
+    //TODO: allow admin add new staking pools
 
     #[payable]
     pub fn storage_deposit(&mut self) {
@@ -89,9 +116,33 @@ impl StakingContract {
         }
     }
 
-    pub fn get_new_data(&self) -> U128 {
-        self.new_data
-    }
+    // pub fn get_new_data(&self) -> U128 {
+    //     self.new_data
+    // }
+
+    // pub fn get_available_reward_tokens(&mut self) -> Promise {
+    //     ext_reward_contract::get_unminted_tokens(
+    //         &REWARD_TOKEN_ACCOUNT_ID.to_string(), // contract account id
+    //         0,                                    // yocto NEAR to attach
+    //         5_000_000_000_000,
+    //     )
+    //     .then(ext_self::unminted_tokens_callback(
+    //         &env::current_account_id(), // this contract's account id
+    //         0,                          // yocto NEAR to attach to the callback
+    //         5_000_000_000_000,
+    //     ))
+    // }
+
+    // pub fn unminted_tokens_callback(&self) -> U128 {
+    //     assert_eq!(env::promise_results_count(), 1, "This is a callback method");
+
+    //     match env::promise_result(0) {
+    //         PromiseResult::Successful(result) => {
+    //             near_sdk::serde_json::from_slice::<U128>(&result).unwrap()
+    //         }
+    //         _ => U128(0),
+    //     }
+    // }
 }
 
 //NOTE: Utils
