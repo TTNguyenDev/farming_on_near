@@ -146,7 +146,21 @@ impl StakingContract {
 
         match env::promise_result(0) {
             PromiseResult::NotReady => unreachable!(),
-            PromiseResult::Successful(_value) => U128(balance),
+            PromiseResult::Successful(_value) => {
+                //NOTE: Update global pool
+                let mut staking_pool = self
+                    .staking_pools
+                    .get(&contract_id.clone())
+                    .expect("Pool not found");
+                let new_contract_reward =
+                    self.internal_calculate_global_reward(contract_id.clone());
+                staking_pool.pre_reward += new_contract_reward;
+                staking_pool.last_block_balance_change = env::block_index();
+                staking_pool.total_stake_balance -= balance;
+                self.staking_pools
+                    .insert(&contract_id.clone(), &staking_pool);
+                U128(balance)
+            }
             PromiseResult::Failed => {
                 //NOTE: handle rollback data
                 let mut account = self.accounts.get(&account_id).expect("User not found");

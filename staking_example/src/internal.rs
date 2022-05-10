@@ -20,18 +20,6 @@ impl StakingContract {
 
         self.accounts.insert(&account_id, &account);
 
-        //NOTE: Update global pool
-        let mut staking_pool = self
-            .staking_pools
-            .get(&contract_id.clone())
-            .expect("Pool not found");
-        let new_contract_reward = self.internal_calculate_global_reward(contract_id.clone());
-        staking_pool.pre_reward += new_contract_reward;
-        staking_pool.last_block_balance_change = env::block_index();
-        staking_pool.total_stake_balance -= user_stake_balance;
-        self.staking_pools
-            .insert(&contract_id.clone(), &staking_pool);
-
         user_stake_balance
     }
 

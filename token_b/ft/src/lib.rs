@@ -22,11 +22,7 @@ use near_contract_standards::fungible_token::FungibleToken;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::LazyOption;
 use near_sdk::json_types::U128;
-use near_sdk::{
-    env, log, near_bindgen, AccountId, Balance, BlockHeight, PanicOnDefault, PromiseOrValue,
-};
-
-const NUM_TOKEN_MINT_EVERY_BLOCK: Balance = 100;
+use near_sdk::{env, log, near_bindgen, AccountId, Balance, PanicOnDefault, PromiseOrValue};
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
@@ -39,9 +35,33 @@ const DATA_IMAGE_SVG_NEAR_ICON: &str = "data:image/svg+xml,%3Csvg xmlns='http://
 
 #[near_bindgen]
 impl Contract {
+    /// Initializes the contract with the given total supply owned by the given `owner_id` with
+    /// default metadata (for example purposes only).
     #[init]
-    pub fn new(owner_id: AccountId, metadata: FungibleTokenMetadata) -> Self {
-        let init_total_supply = U128(0);
+    pub fn new_default_meta(owner_id: AccountId, total_supply: U128) -> Self {
+        Self::new(
+            owner_id,
+            total_supply,
+            FungibleTokenMetadata {
+                spec: FT_METADATA_SPEC.to_string(),
+                name: "Example NEAR fungible token".to_string(),
+                symbol: "EXAMPLE".to_string(),
+                icon: Some(DATA_IMAGE_SVG_NEAR_ICON.to_string()),
+                reference: None,
+                reference_hash: None,
+                decimals: 24,
+            },
+        )
+    }
+
+    /// Initializes the contract with the given total supply owned by the given `owner_id` with
+    /// the given fungible token metadata.
+    #[init]
+    pub fn new(
+        owner_id: AccountId,
+        total_supply: U128,
+        metadata: FungibleTokenMetadata,
+    ) -> Self {
         assert!(!env::state_exists(), "Already initialized");
         metadata.assert_valid();
         let mut this = Self {
@@ -49,37 +69,15 @@ impl Contract {
             metadata: LazyOption::new(b"m".to_vec(), Some(&metadata)),
         };
         this.token.internal_register_account(&owner_id);
-        this.token.internal_deposit(&owner_id, init_total_supply.into());
+        this.token.internal_deposit(&owner_id, total_supply.into());
         near_contract_standards::fungible_token::events::FtMint {
             owner_id: &owner_id,
-            amount: &init_total_supply,
+            amount: &total_supply,
             memo: Some("Initial tokens supply is minted"),
         }
         .emit();
         this
     }
-
-    pub fn mint(&mut self, to: AccountId, amount: Balance) {
-        //NOTE: Comment this line for development
-        // assert!(
-        //     env::predecessor_account_id().to_string() == "staking_pool_owner.testnet",
-        //     "Only staking pool owner can mint"
-        // );
-
-        let balance = self.token.accounts.get(&to).unwrap_or(0);
-        self.token.internal_deposit(&to, balance + amount);
-
-        near_contract_standards::fungible_token::events::FtMint {
-            owner_id: &env::predecessor_account_id(),
-            amount: &U128::from(amount),
-            memo: Some(""),
-        }
-        .emit();
-    }
-    // NOTE: use build-in function instead ft_total_supply
-    // pub fn get_total_supply(&self) -> u128 {
-    //     self.token.total_supply
-    // }
 
     fn on_account_closed(&mut self, account_id: AccountId, balance: Balance) {
         log!("Closed @{} with {}", account_id, balance);
