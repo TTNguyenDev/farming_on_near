@@ -49,4 +49,9 @@ impl StakingContract {
             .expect("Pool not found");
         WrappedStakingPoolInfo::from(pool_info)
     }
+
+    pub fn get_pool_reward(&self, contract_id: AccountId) -> U128 {
+        let new_contract_reward = self.internal_calculate_global_reward(contract_id.clone());
+        U128(new_contract_reward)
+    }
 }

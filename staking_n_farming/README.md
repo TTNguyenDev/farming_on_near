@@ -44,12 +44,18 @@ near call $CONTRACT_NAME unstake '{"contract_id": "'$TOKEN_A'"}' --accountId use
 
 # Harvest - claim reward - Token C
 ```sh
-#View reward amount 
-
 #Add Reward token to wallet - storage_deposit
 near call $TOKEN_C storage_deposit '' --accountId user1-stakenet.testnet --amount 0.00125
 
 near call $CONTRACT_NAME harvest '{"contract_id": "'$TOKEN_A'"}' --accountId user1-stakenet.testnet --depositYocto 1 --gas 300000000000000
 ```
+
+# Statictis functions
+```sh
+near view $CONTRACT_NAME get_account_reward '{"account_id": "user1-stakenet.testnet", "token": "'$TOKEN_A'"}' 
+
+near view $CONTRACT_NAME get_pool_reward '{"contract_id": "'$TOKEN_B'"}'
+```
+
 
 # Transfer token B to staking contract

@@ -8,10 +8,6 @@ pub struct Account {
     pub stake_balance: HashMap<AccountId, Balance>,
     pub pre_reward: HashMap<AccountId, Balance>,
     pub last_block_balance_change: HashMap<AccountId, BlockHeight>,
-    // pub unstake_balance: Balance,
-    // pub unstake_start_timestamp: Timestamp,
-    // pub unstake_available_epoch: EpochHeight,
-    // pub new_account_data: U128,
 }
 
 impl Account {
@@ -70,32 +66,13 @@ impl Account {
     }
 }
 
-// #[derive(Deserialize, Serialize)]
-// #[serde(crate = "near_sdk::serde")]
-// pub struct WrappedAccount {
-//     pub account_id: AccountId,
-//     pub stake_balance: U128,
-//     pub unstake_balance: U128,
-//     pub reward: U128,
-//     pub can_withdraw: bool,
-//     pub unstake_start_timestamp: Timestamp,
-//     pub unstake_available_epoch: EpochHeight,
-//     pub current_epoch: EpochHeight,
-//     pub new_account_data: U128,
-// }
+#[near_bindgen]
+impl StakingContract {
+    pub fn get_account_reward(&self, account_id: AccountId, token: AccountId) -> Balance {
+        let account = self.accounts.get(&account_id).unwrap();
 
-// impl WrappedAccount {
-//     pub fn from(account_id: AccountId, new_reward: Balance, account: Account) -> Self {
-//         WrappedAccount {
-//             account_id,
-//             stake_balance: U128(account.stake_balance),
-//             unstake_balance: U128(account.unstake_balance),
-//             reward: U128(account.pre_reward + new_reward),
-//             can_withdraw: account.unstake_available_epoch <= env::epoch_height(),
-//             unstake_start_timestamp: account.unstake_start_timestamp,
-//             unstake_available_epoch: account.unstake_available_epoch,
-//             current_epoch: env::epoch_height(),
-//             new_account_data: account.new_account_data,
-//         }
-//     }
-// }
+        let new_reward = self.internal_calculate_account_reward(&account, token.clone());
+
+        account.pre_reward.get(&token).unwrap_or(&0) + new_reward
+    }
+}
