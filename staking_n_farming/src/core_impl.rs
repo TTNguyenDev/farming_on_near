@@ -28,8 +28,13 @@ pub trait ExtStakingContract {
         account_id: AccountId,
         contract_id: AccountId,
         balance: Balance,
+    ) -> U128;
+    fn mint_reward_token_callback(
+        &mut self,
+        account_id: AccountId,
+        contract_id: AccountId,
+        balance: Balance,
     );
-    fn mint_reward_token_callback(&mut self);
 }
 
 #[near_bindgen]
@@ -87,22 +92,49 @@ impl StakingContract {
             account.pre_reward.get(&contract_id).unwrap_or(&0) + new_reward;
         assert!(current_reward > 0, "ERR_REWARD_EQUAL_ZERO");
 
-        ext_ft_contract::ft_transfer(
+        ext_reward_contract::mint(
             account_id.clone(),
-            U128(current_reward),
-            Some("Staking contract harvest".to_string()),
-            &self.reward_contract_id,
-            DEPOSIT_ONE_YOCTO,
-            FT_TRANSFER_GAS,
+            current_reward,
+            &REWARD_TOKEN_ACCOUNT_ID.to_string(),
+            NO_DEPOSIT,
+            FT_HARVEST_CALLBACK_GAS,
         )
-        .then(ext_self::ft_transfer_callback(
-            U128(current_reward),
+        .then(ext_self::mint_reward_token_callback(
             account_id.clone(),
             contract_id.clone(),
+            current_reward,
             &env::current_account_id(),
             NO_DEPOSIT,
             FT_HARVEST_CALLBACK_GAS,
         ))
+    }
+
+    #[private]
+    pub fn mint_reward_token_callback(
+        &mut self,
+        account_id: AccountId,
+        contract_id: AccountId,
+        balance: Balance,
+    ) -> U128 {
+        assert_eq!(env::promise_results_count(), 1, "ERR_TOO_MANY_RESULT");
+
+        match env::promise_result(0) {
+            PromiseResult::NotReady => unreachable!(),
+            PromiseResult::Failed => env::panic(b"ERR_CALLBACK"),
+            PromiseResult::Successful(_value) => {
+                let mut account = self.accounts.get(&account_id).unwrap();
+                account.reset_reward(&contract_id);
+                self.accounts.insert(&account_id, &account);
+
+                let mut staking_pool = self
+                    .staking_pools
+                    .get(&contract_id)
+                    .expect("Pool not found");
+                staking_pool.total_paid_reward_balance += balance;
+                self.staking_pools.insert(&contract_id, &staking_pool);
+                U128(balance)
+            }
+        }
     }
 
     //Stake user token
@@ -136,6 +168,7 @@ impl StakingContract {
         }
     }
 
+    #[private]
     pub fn ft_withdraw_callback(
         &mut self,
         account_id: AccountId,

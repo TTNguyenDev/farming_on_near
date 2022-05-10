@@ -1,5 +1,6 @@
 use crate::*;
 
+//Stats
 #[derive(Deserialize, Serialize)]
 #[serde(crate = "near_sdk::serde")]
 pub struct WrappedPool {

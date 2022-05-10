@@ -37,8 +37,6 @@ pub struct StakingContract {
     pub owner_id: AccountId,
     pub staking_pools: UnorderedMap<AccountId, StakingPoolInfo>,
 
-    pub reward_contract_id: AccountId,
-
     pub accounts: LookupMap<AccountId, Account>, // thông tin chi tiết của acount map theo account id
 }
 
@@ -48,7 +46,6 @@ impl StakingContract {
     pub fn new(owner_id: AccountId) -> Self {
         let mut staking_contract = StakingContract {
             owner_id,
-            reward_contract_id: REWARD_TOKEN_ACCOUNT_ID.to_string(),
             accounts: LookupMap::new(StorageKey::AccountKey),
             staking_pools: UnorderedMap::new(StorageKey::StakingPools),
         };
@@ -115,34 +112,6 @@ impl StakingContract {
             U128(0)
         }
     }
-
-    // pub fn get_new_data(&self) -> U128 {
-    //     self.new_data
-    // }
-
-    // pub fn get_available_reward_tokens(&mut self) -> Promise {
-    //     ext_reward_contract::get_unminted_tokens(
-    //         &REWARD_TOKEN_ACCOUNT_ID.to_string(), // contract account id
-    //         0,                                    // yocto NEAR to attach
-    //         5_000_000_000_000,
-    //     )
-    //     .then(ext_self::unminted_tokens_callback(
-    //         &env::current_account_id(), // this contract's account id
-    //         0,                          // yocto NEAR to attach to the callback
-    //         5_000_000_000_000,
-    //     ))
-    // }
-
-    // pub fn unminted_tokens_callback(&self) -> U128 {
-    //     assert_eq!(env::promise_results_count(), 1, "This is a callback method");
-
-    //     match env::promise_result(0) {
-    //         PromiseResult::Successful(result) => {
-    //             near_sdk::serde_json::from_slice::<U128>(&result).unwrap()
-    //         }
-    //         _ => U128(0),
-    //     }
-    // }
 }
 
 //NOTE: Utils

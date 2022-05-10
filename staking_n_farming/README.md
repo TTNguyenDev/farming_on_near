@@ -6,6 +6,7 @@
 
 #Register account
 ```sh
+near call $CONTRACT_NAME new '{"owner_id": "unify.testnet"}' --accountId $CONTRACT_NAME
 near call $CONTRACT_NAME storage_deposit '{}' --accountId user1-stakenet.testnet --deposit 1
 ```
 
@@ -31,6 +32,8 @@ near call $TOKEN_A ft_transfer_call '{"receiver_id": "'$CONTRACT_NAME'", "amount
 
 #check pool balance
 near view $CONTRACT_NAME get_staking_pool_info '{"contract_id": "'$TOKEN_A'"}' 
+
+near view $CONTRACT_NAME get_staking_pool_info '{"contract_id": "'$TOKEN_B'"}' 
 ```
 
 # Unstake - Unstake and automatically send token to your near wallet
@@ -42,6 +45,9 @@ near call $CONTRACT_NAME unstake '{"contract_id": "'$TOKEN_A'"}' --accountId use
 # Harvest - claim reward - Token C
 ```sh
 #View reward amount 
+
+#Add Reward token to wallet - storage_deposit
+near call $TOKEN_C storage_deposit '' --accountId user1-stakenet.testnet --amount 0.00125
 
 near call $CONTRACT_NAME harvest '{"contract_id": "'$TOKEN_A'"}' --accountId user1-stakenet.testnet --depositYocto 1 --gas 300000000000000
 ```
